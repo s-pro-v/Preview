@@ -94,19 +94,17 @@ header {
     padding: 0.2rem 0.5rem;
     border-bottom: 1px solid var(--border-color);
     background-color: var(--panel-bg);
-    gap: 12px;
+    gap: 8px;
     flex-shrink: 0;
 }
 
 .header-controls-right {
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-height: 36px;
-    padding: 4px 8px;
+    gap: 6px;
+    padding: 0.2rem 0.5rem;
     margin-left: auto;
-    background-color: var(--button-bg);
-    border: 1px solid var(--border-color);
+
     border-radius: var(--border-radius);
 }
 
@@ -395,7 +393,7 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.5rem 1rem;
+    padding: 0.2rem 1rem;
     border-bottom: 1px solid var(--border-color);
     background-color: var(--card-bg);
 }
@@ -429,8 +427,15 @@ header {
 .url-item {
     display: block;
     width: 100%;
+
+    min-height: 30px;
+    padding: 0.2rem 0.5rem;
+    background-color: var(--button-bg);
+    color: var(--button-text);
+
     min-height: 36px;
     padding: 8px 16px;
+
     border: 1px solid var(--border-color);
     background-color: var(--card-bg);
     color: var(--text-muted);
@@ -504,7 +509,7 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.5rem 1rem;
+    padding: 0.2rem 0.5rem;
     border-bottom: 1px solid var(--border-color);
     background-color: var(--panel-bg);
 }
@@ -529,8 +534,8 @@ header {
 
 .modal-tab {
     flex: 1;
-    min-height: 36px;
-    padding: 8px 16px;
+    min-height: 30px;
+    padding: 0.2rem 0.5rem;
     background: none;
     border: none;
     border-bottom: 2px solid var(--border-color);
@@ -543,7 +548,7 @@ header {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .modal-tab:hover {
@@ -585,7 +590,7 @@ header {
 
 .form-group input[type="text"] {
     width: 100%;
-    padding: 10px 12px;
+    padding: 0.2rem 0.5rem;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
     background-color: var(--bg);
@@ -640,19 +645,19 @@ header {
     display: flex;
     flex-grow: 1;
     align-items: center;
-    min-height: 36px;
-    padding: 4px 8px;
+    min-height: 33px;
+    padding: 0rem 0.5rem;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
     background-color: var(--button-bg);
-    gap: 8px;
+    gap: 6px;
 }
 
 #urlInput {
     flex-grow: 1;
-    min-height: 26px;
-    padding: 4px 12px;
-    border: 1px solid var(--border-color);
+    min-height: 20px;
+    padding: 0.2rem 0.5rem;
+    border: none;
     border-radius: var(--border-radius);
     background-color: var(--bg);
     color: var(--text-color);
@@ -662,24 +667,38 @@ header {
 
 #urlInput:focus {
     outline: none;
+
+    box-shadow: 0 0 0 1px var(--highlight-color);
+
     border-bottom-color: var(--highlight-color);
     background-color: var(--panel-bg);
+
 }
 
-/* Bazowe style przycisków */
-.button,
+/* Bazowe style dla wszystkich przycisków */
 button {
-    display: inline-flex;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+/* Przycisk listy URL (w input-group) */
+.btn-toggle-url-list {
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    min-height: 36px;
-    padding: 8px 16px;
+    gap: 2px;
+    min-height: 28px;
+    padding: 0rem 0.5rem;
     border: 1px solid var(--border-color);
     background-color: var(--card-bg);
     color: var(--text-muted);
     font-size: 0.9rem;
     font-weight: 600;
+
+}
+
+.btn-toggle-url-list:hover {
+    background-color: var(--button-hover-bg);
+
     cursor: pointer;
 
     transition: 0.30s ease;
@@ -699,13 +718,65 @@ button:hover {
 button:active {
     box-shadow: var(--o-box-shadow-active);
     color: var(--status-active-bg)
+
 }
 
-.button:disabled,
-button:disabled {
+/* Przycisk Pobierz (główny) */
+.btn-fetch {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--resizer-color);
+    border-radius: var(--border-radius);
+    background-color: var(--bg);
+    color: var(--button-primary-bg);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.btn-fetch:hover {
+    background-color: var(--button-primary-hover-bg);
+    border-color: var(--button-primary-hover-bg);
+    color: var(--button-text);
+}
+
+.btn-fetch:disabled {
     opacity: 0.7;
     cursor: not-allowed;
 }
+
+
+/* Przyciski ikonowe (toggle editor, theme, close) */
+.btn-icon {
+    align-items: center;
+    justify-content: center;
+    width: 35px;
+    height: 35px;
+    padding:  0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background-color: var(--bg);
+    color: var(--button-text);
+    font-size: 1rem;
+}
+
+.btn-icon:hover {
+    background-color: var(--button-hover-bg);
+}
+
+
+.btn-icon-close {
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background-color: var(--bg);
+    color: var(--button-text);
+    align-items: center;
+    justify-content: center;
 
 .button-primary {
     border: 1px solid var(--border-color);
@@ -728,28 +799,32 @@ button:disabled {
     color: var(--text-color);
     border-color: var(--border-color);
     box-shadow: var(--box-shadow);
+
 }
 
-.button-small {
-    min-height: 32px;
-    padding: 6px 12px;
-    font-size: 0.85rem;
+.btn-icon-close:hover {
+    color: red;
 }
 
-.icon-button {
-    display: inline-flex;
+/* Małe przyciski akcji (dodaj URL, załaduj listę) */
+.btn-small {
+    /* display: inline-flex; */
     align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 36px;
-    height: 36px;
-    padding: 4px 8px;
+    gap: 6px;
+    min-height: 30px;
+    padding: 0.2rem 0.5rem;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
     background-color: var(--bg);
     color: var(--button-text);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 600;
+
+}
+
+.btn-small:hover {
+    background-color: var(--button-hover-bg);
+
     cursor: pointer;
     transition: 0.30s ease;
 }
@@ -760,15 +835,48 @@ button:disabled {
     color: var(--text-color);
     border-color: var(--border-color);
     box-shadow: var(--box-shadow);
+
 }
 
-.editor-controls {
-    padding: 8px 12px;
-    border-top: 1px solid var(--border-color);
-    background-color: var(--panel-bg);
-    flex-shrink: 0;
-    white-space: nowrap;
+/* Przycisk aktualizuj podgląd */
+.btn-update-preview {
+    /* display: inline-flex; */
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--resizer-color);
+    border-radius: var(--border-radius);
+    background-color: var(--bg);
+    color: var(--button-text);
+    font-size: 0.9rem;
+    font-weight: 600;
 }
+
+
+.btn-update-preview:hover {
+    background-color: var(--button-hover-bg);
+}
+
+/* Przyciski główne w modalu (Dodaj do listy, Załaduj listę) */
+.btn-modal-action {
+    /* display: inline-flex; */
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--button-primary-bg);
+    border-radius: var(--border-radius);
+    background-color: var(--button-primary-bg);
+    color: var(--button-primary-text);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.btn-modal-action:hover {
+    background-color: var(--button-primary-hover-bg);
+    border-color: var(--button-primary-hover-bg);
 
 #updatePreviewButton {
     border: 1px solid var(--border-color);
@@ -784,8 +892,12 @@ button:disabled {
     box-shadow: var(--box-shadow);
 }
 
-#updatePreviewButton:active {
-    opacity: 0.7;
+.editor-controls {
+    padding: 0.2rem 0.5rem;
+    border-top: 1px solid var(--border-color);
+    background-color: var(--panel-bg);
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 #languageSelector {
@@ -803,7 +915,7 @@ button:disabled {
 
 /* Loader */
 .loader {
-    border: 3px solid var(--button-primary-text);
+    border: 2px solid var(--button-primary-text);
     border-top: 3px solid transparent;
     border-radius: 50%;
     width: 16px;

@@ -72,7 +72,9 @@ const URL_MASTER = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_RE
 // Lista URL - domyślna i załadowana z localStorage
 let savedUrls = JSON.parse(localStorage.getItem('savedUrls') || '[]');
 
-// Funkcja do wyodrębnienia nazwy z URL
+
+// URL listy do załadowania
+const URL_LIST_SOURCE = 'https://gist.githubusercontent.com/skokivPr/b351264e9a24e4bffbe086c538f5b744/raw/80294412cbeea0923fbc04a728db9da6603b2a0a/lista';
 function extractNameFromUrl(url) {
     const shortName = url.substring(url.lastIndexOf('/') + 1) || url;
     return shortName;
@@ -624,4 +626,7 @@ require(['vs/editor/editor.main'], function () {
     // Opcjonalnie: Automatyczne ładowanie przy pustej liście (odkomentuj jeśli chcesz)
     // if (savedUrls.length === 0) { loadGithubProjects(); }
 
+
+
 });
+

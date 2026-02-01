@@ -532,7 +532,7 @@
         /* --- URL LIST PANEL --- */
         .url-list-panel {
             position: fixed;
-            top: 85px;
+            top: 70px;
             /* Below Header */
             left: -420px;
             width: 400px;
@@ -816,3 +816,4 @@
             min-width: 25px;
             height: 25px;
         }
+

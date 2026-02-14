@@ -63,7 +63,7 @@ const modalListUrlInput = document.getElementById('modalListUrlInput');
 const modalLoadListButton = document.getElementById('modalLoadListButton');
 
 // Konfiguracja GitHub Fetching (Z nowego kodu)
-const GITHUB_USER = 'skokivPr';
+const GITHUB_USER = 's-pro-v';
 const GITHUB_REPO = 'json-lista';
 const GITHUB_FILE = 'html.json';
 const URL_MAIN = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/${GITHUB_FILE}`;
@@ -74,7 +74,7 @@ let savedUrls = JSON.parse(localStorage.getItem('savedUrls') || '[]');
 
 
 // URL listy do załadowania
-const URL_LIST_SOURCE = 'https://gist.githubusercontent.com/skokivPr/b351264e9a24e4bffbe086c538f5b744/raw/80294412cbeea0923fbc04a728db9da6603b2a0a/lista';
+const URL_LIST_SOURCE = 'https://gist.githubusercontent.com/s-pro-v/b351264e9a24e4bffbe086c538f5b744/raw/80294412cbeea0923fbc04a728db9da6603b2a0a/lista';
 function extractNameFromUrl(url) {
     const shortName = url.substring(url.lastIndexOf('/') + 1) || url;
     return shortName;
@@ -629,4 +629,5 @@ require(['vs/editor/editor.main'], function () {
 
 
 });
+
 

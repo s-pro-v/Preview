@@ -973,17 +973,15 @@
        display: flex;
        align-items: center;
        justify-content: center;
-       gap: 4px;
+       gap: 0.125rem;
        box-shadow: var(--shadow-inset);
-       padding: 3px;
+       padding: 0.125rem;
        border: 1px solid var(--border-color);
-       outline: 1px solid var(--border-color);
-       outline-offset: -2px;
        overflow: hidden;
        position: relative;
        height: 40px;
        box-sizing: border-box;
-   }
+      }
 
    .box-btn .btn-base {
        height: 100%;

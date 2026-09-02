@@ -329,7 +329,7 @@
 
    /* --- BUTTONS (PHYS-BTN) --- */
    .btn-base {
-       height: 35px;
+       height: 34px;
        min-width: 35px;
        background: var(--panel-bg);
        box-shadow: var(--shadow-drop);
@@ -347,7 +347,7 @@
        padding: 0 15px;
        gap: 8px;
        overflow: hidden;
-       position: relative
+       position: relative;
    }
 
 
@@ -714,7 +714,11 @@
 
    .panel-toolbar {
        display: flex;
-       gap: 10px;
+       gap: 0.125rem;
+       box-shadow: var(--shadow-inset);
+       padding: 0.125rem;
+       position: relative;
+       overflow: hidden;
    }
 
    .url-list-content {
@@ -722,18 +726,20 @@
        overflow-y: auto;
        background: var(--bg-color);
        box-shadow: var(--shadow-inset);
-       padding: 4px;
+       padding: 0.125rem;
        border: 1px solid var(--border-color);
+       gap: 0.125rem;
+       display: flex;
+       flex-direction: column;
    }
 
    .url-item {
        display: flex;
        align-items: center;
        justify-content: space-between;
-       padding: 0.563rem 1rem;
+       padding: 0.559rem 1rem;
        background: var(--panel-bg);
        box-shadow: var(--shadow-drop);
-       margin-bottom: 0.25rem;
        border: 1px solid var(--border-color);
        cursor: pointer;
        transition: 0.2s;
@@ -875,6 +881,13 @@
        background-image: linear-gradient(135deg, var(--screen-bg) 25%, transparent 25%, transparent 50%, var(--screen-bg) 50%, var(--screen-bg) 75%,
                transparent 75%, transparent);
        background-size: 10px 10px;
+   }
+
+   .url-list-footer {
+       box-shadow: var(--shadow-inset);
+       padding: 0.125rem;
+       position: relative;
+       overflow: hidden;
    }
 
    /* --- UTILS --- */

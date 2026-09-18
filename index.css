@@ -973,15 +973,17 @@
        display: flex;
        align-items: center;
        justify-content: center;
-       gap: 0.125rem;
+       gap: 4px;
        box-shadow: var(--shadow-inset);
-       padding: 0.125rem;
+       padding: 3px;
        border: 1px solid var(--border-color);
+       outline: 1px solid var(--border-color);
+       outline-offset: -2px;
        overflow: hidden;
        position: relative;
        height: 40px;
        box-sizing: border-box;
-      }
+   }
 
    .box-btn .btn-base {
        height: 100%;
@@ -1737,4 +1739,42 @@
 
    .ja-select-item.ja-selected .ja-select-prefix {
        opacity: 1;
+   }
+
+   /* Przeniesione z index.html */
+   .app-container {
+       padding: 0.4rem 0 0;
+   }
+
+   .url-list-panel {
+       bottom: 30px;
+   }
+
+   .url-item {
+       padding: 0.559rem 1rem;
+   }
+
+   #closeModalButton {
+       height: 30px;
+       min-width: 30px;
+   }
+
+   .modal-spacer {
+       height: 15px;
+   }
+
+   .modal-description-text {
+       color: var(--text-color);
+       margin-top: 10px;
+       font-size: 0.8rem;
+   }
+
+   .modal-buttons-group {
+       display: flex;
+       gap: 0.125rem;
+       margin-top: 20px;
+       box-shadow: var(--shadow-inset);
+       padding: 0.125rem;
+       position: relative;
+       overflow: hidden;
    }

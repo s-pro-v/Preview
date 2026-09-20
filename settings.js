@@ -448,10 +448,12 @@ function buildSettingItemHTML(item) {
                     <span>${item.label}</span>
                 </label>
                 <div class="ja-select-wrap" data-setting="${item.key}">
-                    <button type="button" class="ja-select-btn">
-                        <span class="ja-select-label">${selectedOpt.label}</span>
-                        <span class="ja-select-arrow">▼</span>
-                    </button>
+                    <div class="btn-bg full-width">
+                        <button type="button" class="ja-select-btn">
+                            <span class="ja-select-label">${selectedOpt.label}</span>
+                            <span class="ja-select-arrow">▼</span>
+                        </button>
+                    </div>
                     <div class="ja-select-list">
                         ${optionsHTML}
                     </div>
@@ -484,9 +486,11 @@ function renderSettingsPanel() {
         <div id="settingsSidebar" class="settings-sidebar">
             <div class="settings-sidebar-header">
                 <h2 class="settings-sidebar-title">Ustawienia</h2>
-                <button class="close-settings" id="closeSettingsButton" type="button" aria-label="Zamknij">
-                    <i class="fas fa-times"></i>
-                </button>
+                <div class="btn-bg">
+                    <button class="close-settings" id="closeSettingsButton" type="button" aria-label="Zamknij">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
             </div>
             <div id="settingsSidebarBody" class="settings-sidebar-body">
                 <div class="settings-tabs">
@@ -642,10 +646,12 @@ function setupSettingsEventListeners() {
 
             document.querySelectorAll('.ja-select-btn').forEach(b => b.classList.remove('ja-open'));
             document.querySelectorAll('.ja-select-list').forEach(l => l.classList.remove('ja-visible'));
+            document.querySelectorAll('.setting-item').forEach(s => s.classList.remove('ja-open'));
 
             if (!isOpen && list) {
                 btn.classList.add('ja-open');
                 list.classList.add('ja-visible');
+                btn.closest('.setting-item')?.classList.add('ja-open');
             }
             return;
         }
@@ -673,6 +679,7 @@ function setupSettingsEventListeners() {
 
                 if (btn) btn.classList.remove('ja-open');
                 if (list) list.classList.remove('ja-visible');
+                wrap.closest('.setting-item')?.classList.remove('ja-open');
 
                 if (settingName) {
                     window.updateSetting(settingName, val);
@@ -684,6 +691,7 @@ function setupSettingsEventListeners() {
         if (!e.target.closest('.ja-select-wrap')) {
             document.querySelectorAll('.ja-select-btn').forEach(b => b.classList.remove('ja-open'));
             document.querySelectorAll('.ja-select-list').forEach(l => l.classList.remove('ja-visible'));
+            document.querySelectorAll('.setting-item').forEach(s => s.classList.remove('ja-open'));
         }
     });
 }

@@ -1,3 +1,2336 @@
+
+Rozmowa z Gemini
+// --- CONFIG ---
+
+const GITHUB_CFG = {
+
+  USER: "s-pro-v",
+
+  REPO: "json-lista",
+
+  FILE: "html.json",
+
+};
+
+
+
+// --- THEME ENGINE ---
+
+const themeEngine = {
+
+  init: () => {
+
+    const saved = localStorage.getItem("theme") || "dark";
+
+    document.documentElement.setAttribute("theme", saved);
+
+  },
+
+  toggle: () => {
+
+    const current = document.documentElement.getAttribute("theme");
+
+    const next = current === "dark" ? "light" : "dark";
+
+    document.documentElement.setAttribute("theme", next);
+
+    localStorage.setItem("theme", next);
+
+
+
+    if (window.monacoEditor && typeof monaco !== "undefined") {
+
+      const theme = next === "dark" ? "terminal-dark" : "terminal-light";
+
+      try {
+
+        monaco.editor.setTheme(theme);
+
+      } catch (e) {
+
+        // Fallback do standardowych motywów Monaco
+
+        monaco.editor.setTheme(next === "dark" ? "vs-dark" : "vs");
+
+      }
+
+    }
+
+  },
+
+};
+
+
+
+// --- UTILS ---
+
+const sanitizeUrl = (url) => {
+
+  try {
+
+    if (!url) return "";
+
+    const u = new URL(url);
+
+    if (u.hostname === "github.com" && u.pathname.includes("/blob/")) {
+
+      u.hostname = "raw.githubusercontent.com";
+
+      u.pathname = u.pathname.replace("/blob/", "/");
+
+    }
+
+    if (u.hostname === "gist.github.com") {
+
+      u.hostname = "gist.githubusercontent.com";
+
+    }
+
+    return u.toString();
+
+  } catch (e) {
+
+    return url;
+
+  }
+
+};
+
+
+
+const updateStatus = (msg) => {
+
+  const el = document.getElementById("statusBar");
+
+  if (el) el.innerText = `[LOG]: ${msg.toUpperCase()}`;
+
+};
+
+
+
+// --- EDITOR LOGIC ---
+
+// Aktualizacja do nowszej wersji Monaco (np. 0.52.0)
+
+require.config({
+
+  paths: {
+
+    vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.0/min/vs",
+
+  },
+
+});
+
+
+
+require(["vs/editor/editor.main"], function () {
+
+  // Delikatne opóźnienie, aby upewnić się, że ewentualne style/motywy zewnętrzne (monaco-styles.js) się wczytały
+
+  setTimeout(() => {
+
+    const savedContent =
+
+      localStorage.getItem("editorContent") ||
+
+      "<!-- INITIALIZING SYSTEM... -->";
+
+    let theme =
+
+      document.documentElement.getAttribute("theme") === "light"
+
+        ? "terminal-light"
+
+        : "terminal-dark";
+
+
+
+    try {
+
+      if (typeof monaco !== "undefined" && monaco.editor) {
+
+        monaco.editor.setTheme(theme);
+
+      }
+
+    } catch (e) {
+
+      theme =
+
+        document.documentElement.getAttribute("theme") === "light"
+
+          ? "vs"
+
+          : "vs-dark";
+
+    }
+
+
+
+    window.monacoEditor = monaco.editor.create(
+
+      document.getElementById("monacoEditorContainer"),
+
+      {
+
+        value: savedContent || "// TERMINAL_READY\n// START_CODING...",
+
+        language: "html",
+
+        theme: theme,
+
+        fontSize: 13,
+
+        fontFamily:
+
+          "'JetBrains Mono', 'Share Tech Mono', 'Consolas', 'Monaco', 'Courier New', monospace",
+
+        automaticLayout: true,
+
+        minimap: { enabled: true, scale: 0.75 },
+
+        scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
+
+        cursorBlinking: "block",
+
+        bracketPairColorization: { enabled: true },
+
+        guides: { bracketPairs: true, indent: true },
+
+        renderLineHighlight: "line",
+
+        smoothScrolling: true,
+
+        mouseWheelZoom: true,
+
+        wordWrap: "on",
+
+        fontLigatures: true,
+
+        formatOnPaste: true,
+
+        formatOnType: true,
+
+      },
+
+    );
+
+
+
+    window.monacoEditor.onDidChangeModelContent(() => {
+
+      localStorage.setItem("editorContent", window.monacoEditor.getValue());
+
+    });
+
+
+
+    setupEventListeners();
+
+    loadSavedUrls();
+
+  }, 50); // Skrócono timeout
+
+});
+
+
+
+// --- APP LOGIC ---
+
+let savedUrls = JSON.parse(localStorage.getItem("savedUrls") || "[]");
+
+
+
+function setupEventListeners() {
+
+  // --- FETCH ENGINE ---
+
+  document.getElementById("fetchButton").addEventListener("click", async () => {
+
+    const url = sanitizeUrl(document.getElementById("urlInput").value);
+
+    if (!url) return updateStatus("ERROR: MISSING TARGET URL");
+
+
+
+    updateStatus("INITIATING CONNECTION...");
+
+    const loader = document.getElementById("loader");
+
+    const icon = document.querySelector(".fa-download");
+
+
+
+    if (loader) loader.style.display = "block";
+
+    if (icon) icon.style.display = "none";
+
+
+
+    try {
+
+      const res = await fetch(url);
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const text = await res.text();
+
+      window.monacoEditor.setValue(text);
+
+      updateStatus("COMPILE COMPLETE");
+
+
+
+      // Auto-detect language (rozszerzony)
+
+      const model = window.monacoEditor.getModel();
+
+      const lowerUrl = url.toLowerCase();
+
+
+
+      if (lowerUrl.endsWith(".js"))
+
+        monaco.editor.setModelLanguage(model, "javascript");
+
+      else if (lowerUrl.endsWith(".ts"))
+
+        monaco.editor.setModelLanguage(model, "typescript");
+
+      else if (lowerUrl.endsWith(".css"))
+
+        monaco.editor.setModelLanguage(model, "css");
+
+      else if (lowerUrl.endsWith(".json"))
+
+        monaco.editor.setModelLanguage(model, "json");
+
+      else if (lowerUrl.endsWith(".html") || lowerUrl.endsWith(".htm"))
+
+        monaco.editor.setModelLanguage(model, "html");
+
+    } catch (e) {
+
+      updateStatus(`CRITICAL ERROR: ${e.message}`);
+
+    } finally {
+
+      if (loader) loader.style.display = "none";
+
+      if (icon) icon.style.display = "inline-block";
+
+    }
+
+  });
+
+
+
+  // --- PREVIEW ENGINE ---
+
+  document
+
+    .getElementById("updatePreviewButton")
+
+    .addEventListener("click", () => {
+
+      let code = window.monacoEditor.getValue();
+
+      const hideScrollbarStyle = `
+
+            <style>
+
+                html, body, * {
+
+                    scrollbar-width: none !important;
+
+                    -ms-overflow-style: none !important;
+
+                }
+
+                html::-webkit-scrollbar, body::-webkit-scrollbar, *::-webkit-scrollbar {
+
+                    display: none !important;
+
+                    width: 0 !important;
+
+                    height: 0 !important;
+
+                }
+
+            </style>`;
+
+
+
+      if (code.includes("</head>")) {
+
+        code = code.replace("</head>", hideScrollbarStyle + "</head>");
+
+      } else {
+
+        code = hideScrollbarStyle + code;
+
+      }
+
+      document.getElementById("previewFrame").srcdoc = code;
+
+      updateStatus("PREVIEW RENDERED");
+
+    });
+
+
+
+  document.getElementById("stopPreviewButton").addEventListener("click", () => {
+
+    document.getElementById("previewFrame").srcdoc = "";
+
+    updateStatus("PREVIEW STOPPED");
+
+  });
+
+
+
+  // --- UI TOGGLES ---
+
+  document
+
+    .getElementById("themeToggle")
+
+    .addEventListener("click", themeEngine.toggle);
+
+
+
+  const editorPanel = document.getElementById("editorPanel");
+
+  const previewPanel = document.getElementById("previewPanel");
+
+  const resizer = document.getElementById("resizer");
+
+
+
+  document
+
+    .getElementById("toggleEditorButton")
+
+    .addEventListener("click", () => {
+
+      editorPanel.classList.toggle("hidden");
+
+      resizer.classList.toggle("hidden");
+
+      if (editorPanel.classList.contains("hidden")) {
+
+        previewPanel.style.width = "100%";
+
+      } else {
+
+        previewPanel.style.width = ""; // Reset to flex
+
+      }
+
+    });
+
+
+
+  document
+
+    .getElementById("languageSelector")
+
+    .addEventListener("change", (e) => {
+
+      monaco.editor.setModelLanguage(
+
+        window.monacoEditor.getModel(),
+
+        e.target.value,
+
+      );
+
+    });
+
+
+
+  // --- DATABASE PANEL ---
+
+  const urlListPanel = document.getElementById("urlListPanel");
+
+  const toggleUrlListButton = document.getElementById("toggleUrlListButton");
+
+
+
+  toggleUrlListButton.addEventListener("click", (e) => {
+
+    e.stopPropagation();
+
+    urlListPanel.classList.add("active");
+
+  });
+
+
+
+  document
+
+    .getElementById("closeUrlListButton")
+
+    .addEventListener("click", () => {
+
+      urlListPanel.classList.remove("active");
+
+    });
+
+
+
+  document.addEventListener("click", (e) => {
+
+    if (urlListPanel.classList.contains("active")) {
+
+      if (
+
+        !urlListPanel.contains(e.target) &&
+
+        e.target !== toggleUrlListButton
+
+      ) {
+
+        urlListPanel.classList.remove("active");
+
+      }
+
+    }
+
+  });
+
+
+
+  urlListPanel.addEventListener("click", (e) => e.stopPropagation());
+
+
+
+  // --- CONFIRM MODAL LOGIC ---
+
+  const confirmModal = document.getElementById("confirmModal");
+
+  let pendingAction = null;
+
+
+
+  const openConfirm = (callback) => {
+
+    pendingAction = callback;
+
+    confirmModal.classList.add("active");
+
+  };
+
+
+
+  const closeConfirm = () => {
+
+    pendingAction = null;
+
+    confirmModal.classList.remove("active");
+
+  };
+
+
+
+  confirmModal.addEventListener("click", (e) => {
+
+    if (e.target === confirmModal) closeConfirm();
+
+  });
+
+
+
+  document
+
+    .getElementById("executeConfirmButton")
+
+    .addEventListener("click", () => {
+
+      if (pendingAction) pendingAction();
+
+      closeConfirm();
+
+    });
+
+
+
+  document
+
+    .getElementById("cancelConfirmButton")
+
+    .addEventListener("click", closeConfirm);
+
+  document
+
+    .getElementById("closeConfirmModalButton")
+
+    .addEventListener("click", closeConfirm);
+
+
+
+  // --- CLEAR ALL DATABASE ---
+
+  document.getElementById("clearAllButton").addEventListener("click", () => {
+
+    if (savedUrls.length === 0) return updateStatus("DATABASE EMPTY");
+
+    openConfirm(() => {
+
+      savedUrls = [];
+
+      saveUrls();
+
+      renderList();
+
+      updateStatus("REGISTRY PURGED. SYSTEM READY.");
+
+    });
+
+  });
+
+
+
+  // --- RESIZER LOGIC ---
+
+  let isDragging = false;
+
+  let startX = 0;
+
+  let startWidth = 0;
+
+  const MAGNETIC_THRESHOLD = 20;
+
+  const MAGNETIC_POSITIONS = { "-1": 0.25, 0: 0.5, 1: 0.75 };
+
+
+
+  const magneticGuide = document.createElement("div");
+
+  magneticGuide.className = "magnetic-guide";
+
+  const magneticLabel = document.createElement("div");
+
+  magneticLabel.className = "magnetic-label";
+
+  magneticGuide.appendChild(magneticLabel);
+
+  document.body.appendChild(magneticGuide);
+
+
+
+  function getMagneticPosition(x, containerRect) {
+
+    const containerWidth = containerRect.width;
+
+    const relativeX = x - containerRect.left;
+
+    const relativePercent = relativeX / containerWidth;
+
+
+
+    let closestPos = null;
+
+    let closestDist = Infinity;
+
+    let closestLabel = "";
+
+
+
+    for (const [label, percent] of Object.entries(MAGNETIC_POSITIONS)) {
+
+      const targetX = containerRect.left + containerWidth * percent;
+
+      const dist = Math.abs(x - targetX);
+
+      if (dist < MAGNETIC_THRESHOLD && dist < closestDist) {
+
+        closestDist = dist;
+
+        closestPos = targetX;
+
+        closestLabel = label;
+
+      }
+
+    }
+
+    return { position: closestPos, label: closestLabel };
+
+  }
+
+
+
+  resizer.addEventListener("mousedown", (e) => {
+
+    e.preventDefault();
+
+    isDragging = true;
+
+    startX = e.clientX;
+
+    startWidth = editorPanel.offsetWidth;
+
+    resizer.classList.add("dragging");
+
+    document.body.style.cursor = "col-resize";
+
+    document.body.style.userSelect = "none";
+
+
+
+    const iframe = document.querySelector("iframe");
+
+    if (iframe) iframe.style.pointerEvents = "none";
+
+  });
+
+
+
+  document.addEventListener("mouseup", () => {
+
+    if (isDragging) {
+
+      isDragging = false;
+
+      resizer.classList.remove("dragging");
+
+      magneticGuide.classList.remove("active");
+
+      document.body.style.cursor = "";
+
+      document.body.style.userSelect = "";
+
+
+
+      const iframe = document.querySelector("iframe");
+
+      if (iframe) iframe.style.pointerEvents = "auto";
+
+    }
+
+  });
+
+
+
+  document.addEventListener("mousemove", (e) => {
+
+    if (!isDragging) return;
+
+    e.preventDefault();
+
+    document.body.style.cursor = "col-resize";
+
+
+
+    const container = document.querySelector(".content");
+
+    const containerRect = container.getBoundingClientRect();
+
+    let newWidth = startWidth + (e.clientX - startX);
+
+    const minWidth = containerRect.width * 0.15;
+
+    const maxWidth = containerRect.width * 0.85;
+
+
+
+    const magnetic = getMagneticPosition(e.clientX, containerRect);
+
+
+
+    if (magnetic.position !== null) {
+
+      newWidth = magnetic.position - containerRect.left;
+
+      magneticGuide.style.left = `${magnetic.position}px`;
+
+      magneticLabel.textContent = magnetic.label;
+
+      magneticGuide.classList.add("active");
+
+    } else {
+
+      magneticGuide.classList.remove("active");
+
+    }
+
+
+
+    if (newWidth >= minWidth && newWidth <= maxWidth) {
+
+      editorPanel.style.width = `${newWidth}px`;
+
+      editorPanel.style.flexGrow = "0";
+
+      editorPanel.style.flexShrink = "0";
+
+    }
+
+  });
+
+
+
+  // --- ADD URL MODAL ---
+
+  const modal = document.getElementById("addUrlModal");
+
+  document
+
+    .getElementById("addCurrentUrlButton")
+
+    .addEventListener("click", () => {
+
+      modal.classList.add("active");
+
+      switchTab("single");
+
+      document.getElementById("modalUrlInput").value =
+
+        document.getElementById("urlInput").value;
+
+    });
+
+
+
+  document
+
+    .getElementById("closeModalButton")
+
+    .addEventListener("click", () => modal.classList.remove("active"));
+
+
+
+  modal.addEventListener("click", (e) => {
+
+    if (e.target === modal) modal.classList.remove("active");
+
+  });
+
+
+
+  document.getElementById("modalAddButton").addEventListener("click", () => {
+
+    const url = document.getElementById("modalUrlInput").value;
+
+    const name =
+
+      document.getElementById("modalNameInput").value ||
+
+      url.split("/").pop() ||
+
+      "Unnamed";
+
+    if (url) {
+
+      savedUrls.push({ name, url });
+
+      saveUrls();
+
+      renderList();
+
+      modal.classList.remove("active");
+
+      updateStatus(`RECORD ADDED: ${name}`);
+
+    }
+
+  });
+
+
+
+  document.querySelectorAll(".modal-tab").forEach((t) => {
+
+    t.addEventListener("click", () => switchTab(t.dataset.tab));
+
+  });
+
+
+
+  document
+
+    .getElementById("loadGithubButton")
+
+    .addEventListener("click", loadGithub);
+
+}
+
+
+
+function switchTab(tab) {
+
+  document
+
+    .querySelectorAll(".modal-tab")
+
+    .forEach((t) => t.classList.remove("active"));
+
+  document
+
+    .querySelectorAll(".modal-tab-content")
+
+    .forEach((c) => c.classList.add("hidden"));
+
+  document
+
+    .querySelector(`.modal-tab[data-tab="${tab}"]`)
+
+    .classList.add("active");
+
+  document
+
+    .getElementById(tab === "single" ? "tabSingle" : "tabList")
+
+    .classList.remove("hidden");
+
+}
+
+
+
+function saveUrls() {
+
+  localStorage.setItem("savedUrls", JSON.stringify(savedUrls));
+
+}
+
+
+
+function renderList() {
+
+  const container = document.getElementById("urlListItems");
+
+  const counter = document.getElementById("dbCounter");
+
+  if (counter)
+
+    counter.innerText = `[${savedUrls.length.toString().padStart(2, "0")}]`;
+
+
+
+  if (savedUrls.length === 0) {
+
+    container.innerHTML = `<div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 11px; font-style: italic;">REGISTRY EMPTY // AWAITING DATA</div>`;
+
+    return;
+
+  }
+
+
+
+  container.innerHTML = savedUrls
+
+    .map(
+
+      (item, idx) => `
+
+        <div class="url-item" onclick="loadUrl(${idx})">
+
+            <div style="display:flex; align-items:center; overflow:hidden;">
+
+                <span class="url-index">[${idx.toString().padStart(2, "0")}]</span>
+
+                <span class="url-item-name" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${item.url}">${item.name}</span>
+
+            </div>
+
+            <i class="fas fa-trash" style="color:var(--danger-color); cursor:pointer; padding:4px;" onclick="event.stopPropagation(); deleteUrl(${idx})"></i>
+
+        </div>
+
+    `,
+
+    )
+
+    .join("");
+
+}
+
+
+
+window.loadUrl = (idx) => {
+
+  const item = savedUrls[idx];
+
+  document.getElementById("urlInput").value = item.url;
+
+  document.getElementById("fetchButton").click();
+
+  document.getElementById("urlListPanel").classList.remove("active");
+
+};
+
+
+
+// Zastąpiono systemowy window.confirm Twoim modalem (jeśli element confirmModal istnieje w HTML)
+
+window.deleteUrl = (idx) => {
+
+  const confirmModal = document.getElementById("confirmModal");
+
+
+
+  if (confirmModal) {
+
+    // Używamy zdefiniowanego systemu openConfirm
+
+    // UWAGA: openConfirm jest wyizolowane w setupEventListeners,
+
+    // więc używamy obejścia wywołując logikę bezpośrednio na tablicy.
+
+    const item = savedUrls[idx];
+
+    const doDelete = () => {
+
+      savedUrls.splice(idx, 1);
+
+      saveUrls();
+
+      renderList();
+
+      updateStatus(`DELETED: ${item.name}`);
+
+    };
+
+
+
+    // Prowizoryczne podpięcie globalne dla funkcji openConfirm
+
+    if (window.__openConfirmGlobal) {
+
+      window.__openConfirmGlobal(doDelete);
+
+    } else {
+
+      // Fallback na natywny, gdyby funkcja nie była zbindowana
+
+      if (confirm(`CONFIRM DELETION: ${item.name}?`)) doDelete();
+
+    }
+
+  } else {
+
+    if (confirm("CONFIRM DELETION?")) {
+
+      savedUrls.splice(idx, 1);
+
+      saveUrls();
+
+      renderList();
+
+      updateStatus("RECORD DELETED");
+
+    }
+
+  }
+
+};
+
+
+
+function loadSavedUrls() {
+
+  renderList();
+
+}
+
+
+
+// Zrefaktoryzowane na nowoczesne async/await
+
+async function loadGithub() {
+
+  const url = `https://raw.githubusercontent.com/${GITHUB_CFG.USER}/${GITHUB_CFG.REPO}/main/${GITHUB_CFG.FILE}`;
+
+  updateStatus("CONNECTING TO GITHUB MAIN NODE...");
+
+
+
+  try {
+
+    const response = await fetch(url);
+
+    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+
+
+
+    const data = await response.json();
+
+    let count = 0;
+
+
+
+    if (Array.isArray(data)) {
+
+      data.forEach((p) => {
+
+        if (!savedUrls.some((u) => u.url === p.url)) {
+
+          savedUrls.push({
+
+            name: p.name || p.url.split("/").pop(),
+
+            url: p.url,
+
+          });
+
+          count++;
+
+        }
+
+      });
+
+      saveUrls();
+
+      renderList();
+
+      updateStatus(`SYNC COMPLETE. ${count} NEW OBJECTS.`);
+
+    } else {
+
+      updateStatus("SYNC ERROR: INVALID JSON FORMAT");
+
+    }
+
+  } catch (e) {
+
+    updateStatus(`SYNC ERROR: REPOSITORY UNREACHABLE (${e.message})`);
+
+  }
+
+}
+
+
+
+// Globalny binding dla otwierania modalu z wewnątrz funkcji window.deleteUrl
+
+document.addEventListener("DOMContentLoaded", () => {
+
+  const confirmModal = document.getElementById("confirmModal");
+
+  let pendingGlobalAction = null;
+
+
+
+  window.__openConfirmGlobal = (callback) => {
+
+    pendingGlobalAction = callback;
+
+    confirmModal.classList.add("active");
+
+  };
+
+
+
+  document
+
+    .getElementById("executeConfirmButton")
+
+    ?.addEventListener("click", () => {
+
+      if (pendingGlobalAction) {
+
+        pendingGlobalAction();
+
+        pendingGlobalAction = null;
+
+      }
+
+    });
+
+});
+
+
+
+// Init
+
+themeEngine.init();
+
+
+
+
+
+
+
+
+
+-----
+
+
+
+
+
+dodac
+
+fetch('https://raw.githubusercontent.com/s-pro-v/json-lista/main/html.json?t=' + Date.now())
+
+Aby dodać zapobieganie cache'owaniu (cache busting) za pomocą parametru ?t= z Date.now(), wystarczy zmodyfikować funkcję loadGithub() – najlepiej dynamicznie, korzystając z istniejącego obiektu GITHUB_CFG.
+
+Oto zaktualizowana funkcja loadGithub:
+
+JavaScript
+// Zrefaktoryzowane na nowoczesne async/await z cache-bustingiem (?t=Date.now())
+async function loadGithub() {
+  const url = `https://raw.githubusercontent.com/${GITHUB_CFG.USER}/${GITHUB_CFG.REPO}/main/${GITHUB_CFG.FILE}?t=${Date.now()}`;
+  updateStatus("CONNECTING TO GITHUB MAIN NODE...");
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+
+    const data = await response.json();
+    let count = 0;
+
+    if (Array.isArray(data)) {
+      data.forEach((p) => {
+        if (!savedUrls.some((u) => u.url === p.url)) {
+          savedUrls.push({
+            name: p.name || p.url.split("/").pop(),
+            url: p.url,
+          });
+          count++;
+        }
+      });
+      saveUrls();
+      renderList();
+      updateStatus(`SYNC COMPLETE. ${count} NEW OBJECTS.`);
+    } else {
+      updateStatus("SYNC ERROR: INVALID JSON FORMAT");
+    }
+  } catch (e) {
+    updateStatus(`SYNC ERROR: REPOSITORY UNREACHABLE (${e.message})`);
+  }
+}
+Co zostało zmienione
+W linii definiującej adres URL:
+
+Przed:
+
+JavaScript
+const url = `https://raw.githubusercontent.com/${GITHUB_CFG.USER}/${GITHUB_CFG.REPO}/main/${GITHUB_CFG.FILE}`;
+Po:
+
+JavaScript
+const url = `https://raw.githubusercontent.com/${GITHUB_CFG.USER}/${GITHUB_CFG.REPO}/main/${GITHUB_CFG.FILE}?t=${Date.now()}`;
+Dzięki temu każde kliknięcie przycisku pobierania odpyta bezpośrednio serwery GitHub z aktualnym znacznikiem czasu, omijając lokalny cache przeglądarki i CDN RawGit.
+
+// --- CONFIG ---
+
+const GITHUB_CFG = {
+
+    USER: 'skokivPr',
+
+    REPO: 'json-lista',
+
+    FILE: 'html.json'
+
+};
+
+
+
+// --- THEME ENGINE ---
+
+const themeEngine = {
+
+    init: () => {
+
+        const saved = localStorage.getItem('theme') || 'dark';
+
+        document.documentElement.setAttribute('theme', saved);
+
+    },
+
+    toggle: () => {
+
+        const current = document.documentElement.getAttribute('theme');
+
+        const next = current === 'dark' ? 'light' : 'dark';
+
+        document.documentElement.setAttribute('theme', next);
+
+        localStorage.setItem('theme', next);
+
+        if (window.monacoEditor && window.monaco) {
+
+            // Użyj motywów z monaco-styles.js jeśli są dostępne
+
+            const theme = next === 'dark' ? 'terminal-dark' : 'terminal-light';
+
+            try {
+
+                monaco.editor.setTheme(theme);
+
+            } catch (e) {
+
+                // Fallback do standardowych motywów
+
+                monaco.editor.setTheme(next === 'dark' ? 'vs-dark' : 'vs');
+
+            }
+
+        }
+
+    }
+
+};
+
+
+
+// --- UTILS ---
+
+const sanitizeUrl = (url) => {
+
+    try {
+
+        if (!url) return '';
+
+        const u = new URL(url);
+
+        if (u.hostname === 'github.com' && u.pathname.includes('/blob/')) {
+
+            u.hostname = 'raw.githubusercontent.com';
+
+            u.pathname = u.pathname.replace('/blob/', '/');
+
+        }
+
+        if (u.hostname === 'gist.github.com') {
+
+            u.hostname = 'gist.githubusercontent.com';
+
+        }
+
+        return u.toString();
+
+    } catch (e) { return url; }
+
+};
+
+
+
+const updateStatus = (msg) => {
+
+    const el = document.getElementById('statusBar');
+
+    el.innerText = `[LOG]: ${msg.toUpperCase()}`;
+
+};
+
+
+
+// --- EDITOR LOGIC ---
+
+require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
+
+
+
+require(['vs/editor/editor.main'], function () {
+
+    // Poczekaj na załadowanie motywów z monaco-styles.js
+
+    setTimeout(() => {
+
+        const savedContent = localStorage.getItem('editorContent') || '<!-- INITIALIZING SYSTEM... -->';
+
+
+
+        // Użyj motywów z monaco-styles.js jeśli są dostępne
+
+        let theme = document.documentElement.getAttribute('theme') === 'light' ? 'terminal-light' : 'terminal-dark';
+
+        try {
+
+            // Sprawdź czy motyw jest zdefiniowany
+
+            if (typeof monaco !== 'undefined' && monaco.editor) {
+
+                monaco.editor.setTheme(theme);
+
+            }
+
+        } catch (e) {
+
+            // Fallback do standardowych motywów
+
+            theme = document.documentElement.getAttribute('theme') === 'light' ? 'vs' : 'vs-dark';
+
+        }
+
+
+
+        window.monacoEditor = monaco.editor.create(document.getElementById('monacoEditorContainer'), {
+
+            value: savedContent || "// TERMINAL_READY\n// START_CODING...",
+
+            language: 'html',
+
+            theme: theme,
+
+            fontSize: 13,
+
+            fontFamily: "'JetBrains Mono', 'Share Tech Mono', 'Consolas', 'Monaco', 'Courier New', monospace",
+
+            automaticLayout: true,
+
+            minimap: { enabled: true },
+
+            scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
+
+            cursorBlinking: "block",
+
+            bracketPairColorization: { enabled: true },
+
+            guides: { bracketPairs: true, indent: true },
+
+            renderLineHighlight: 'line',
+
+            smoothScrolling: true,
+
+            mouseWheelZoom: true,
+
+            wordWrap: 'on',
+
+            fontLigatures: true
+
+        });
+
+
+
+        window.monacoEditor.onDidChangeModelContent(() => {
+
+            localStorage.setItem('editorContent', window.monacoEditor.getValue());
+
+        });
+
+
+
+        // Bind Events after Monaco Load
+
+        setupEventListeners();
+
+        loadSavedUrls();
+
+        loadSavedSettings();
+
+    }, 100);
+
+});
+
+
+
+// --- APP LOGIC ---
+
+let savedUrls = JSON.parse(localStorage.getItem('savedUrls') || '[]');
+
+
+
+function setupEventListeners() {
+
+    // Fetch
+
+    document.getElementById('fetchButton').addEventListener('click', async () => {
+
+        const url = sanitizeUrl(document.getElementById('urlInput').value);
+
+        if (!url) return updateStatus('ERROR: MISSING TARGET URL');
+
+
+
+        updateStatus('INITIATING CONNECTION...');
+
+        document.getElementById('loader').style.display = 'block';
+
+        document.querySelector('.fa-download').style.display = 'none';
+
+
+
+        try {
+
+            const res = await fetch(url);
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            const text = await res.text();
+
+            window.monacoEditor.setValue(text);
+
+            updateStatus('COMPILE COMPLETE');
+
+
+
+            // Auto-detect language
+
+            if (url.endsWith('.js')) updateLanguageSelection('javascript');
+
+            else if (url.endsWith('.css')) updateLanguageSelection('css');
+
+            else if (url.endsWith('.json')) updateLanguageSelection('json');
+
+            else if (url.endsWith('.html') || url.endsWith('.htm')) updateLanguageSelection('html');
+
+            else if (url.endsWith('.md')) updateLanguageSelection('markdown');
+
+        } catch (e) {
+
+            updateStatus(`CRITICAL ERROR: ${e.message}`);
+
+        } finally {
+
+            document.getElementById('loader').style.display = 'none';
+
+            document.querySelector('.fa-download').style.display = 'inline-block';
+
+        }
+
+    });
+
+
+
+    // Preview
+
+    document.getElementById('updatePreviewButton').addEventListener('click', () => {
+
+        let code = window.monacoEditor.getValue();
+
+        const hideScrollbarStyle = `<style>
+
+                    html, body, * {
+
+                        scrollbar-width: none !important;
+
+                        -ms-overflow-style: none !important;
+
+                    }
+
+                    html::-webkit-scrollbar, body::-webkit-scrollbar, *::-webkit-scrollbar {
+
+                        display: none !important;
+
+                        width: 0 !important;
+
+                        height: 0 !important;
+
+                    }
+
+                </style>`;
+
+        if (code.includes('</head>')) {
+
+            code = code.replace('</head>', hideScrollbarStyle + '</head>');
+
+        } else {
+
+            code = hideScrollbarStyle + code;
+
+        }
+
+        document.getElementById('previewFrame').srcdoc = code;
+
+        updateStatus('COMPILE COMPLETE');
+
+    });
+
+
+
+    document.getElementById('stopPreviewButton').addEventListener('click', () => {
+
+        document.getElementById('previewFrame').srcdoc = '';
+
+        updateStatus('STOP');
+
+    });
+
+
+
+    // UI Toggles
+
+    document.getElementById('themeToggle').addEventListener('click', themeEngine.toggle);
+
+
+
+    const editorPanel = document.getElementById('editorPanel');
+
+    const previewPanel = document.getElementById('previewPanel');
+
+    const resizer = document.getElementById('resizer');
+
+
+
+    document.getElementById('toggleEditorButton').addEventListener('click', () => {
+
+        editorPanel.classList.toggle('hidden');
+
+        resizer.classList.toggle('hidden');
+
+        if (editorPanel.classList.contains('hidden')) {
+
+            previewPanel.style.width = '100%';
+
+        } else {
+
+            previewPanel.style.width = ''; // Reset to flex
+
+        }
+
+    });
+
+
+
+    // Custom Select for Language
+
+    const customSelect = document.getElementById('languageCustomSelect');
+
+    const selectTrigger = customSelect?.querySelector('.select-trigger');
+
+    const selectOptions = customSelect?.querySelector('.select-options');
+
+    const nativeSelect = document.getElementById('languageSelector');
+
+
+
+    function updateLanguageSelection(val) {
+
+        if (nativeSelect) nativeSelect.value = val;
+
+        const options = selectOptions?.querySelectorAll('.option');
+
+        options?.forEach(opt => {
+
+            if (opt.dataset.value === val) {
+
+                opt.classList.add('selected');
+
+                const triggerContent = selectTrigger?.querySelector('.trigger-content');
+
+                if (triggerContent) {
+
+                    const icon = opt.querySelector('i')?.cloneNode(true);
+
+                    triggerContent.innerHTML = '';
+
+                    if (icon) triggerContent.appendChild(icon);
+
+                    const textSpan = document.createElement('span');
+
+                    textSpan.textContent = opt.textContent.trim();
+
+                    triggerContent.appendChild(textSpan);
+
+                }
+
+            } else {
+
+                opt.classList.remove('selected');
+
+            }
+
+        });
+
+        if (window.monacoEditor && window.monaco) {
+
+            monaco.editor.setModelLanguage(window.monacoEditor.getModel(), val);
+
+        }
+
+    }
+
+
+
+    window.updateLanguageSelection = updateLanguageSelection;
+
+
+
+    if (selectTrigger && selectOptions) {
+
+        selectTrigger.addEventListener('click', (e) => {
+
+            e.stopPropagation();
+
+            const isOpen = selectOptions.classList.contains('show');
+
+            selectOptions.classList.toggle('show', !isOpen);
+
+            selectTrigger.classList.toggle('active', !isOpen);
+
+            selectTrigger.setAttribute('aria-expanded', String(!isOpen));
+
+        });
+
+
+
+        selectOptions.querySelectorAll('.option').forEach(opt => {
+
+            opt.addEventListener('click', (e) => {
+
+                e.stopPropagation();
+
+                const val = opt.dataset.value;
+
+                updateLanguageSelection(val);
+
+                selectOptions.classList.remove('show');
+
+                selectTrigger.classList.remove('active');
+
+                selectTrigger.setAttribute('aria-expanded', 'false');
+
+            });
+
+        });
+
+
+
+        document.addEventListener('click', (e) => {
+
+            if (customSelect && !customSelect.contains(e.target)) {
+
+                selectOptions.classList.remove('show');
+
+                selectTrigger.classList.remove('active');
+
+                selectTrigger.setAttribute('aria-expanded', 'false');
+
+            }
+
+        });
+
+    }
+
+
+
+    if (nativeSelect) {
+
+        nativeSelect.addEventListener('change', (e) => {
+
+            updateLanguageSelection(e.target.value);
+
+        });
+
+    }
+
+
+
+    // Database Panel
+
+    const urlListPanel = document.getElementById('urlListPanel');
+
+    const toggleUrlListButton = document.getElementById('toggleUrlListButton');
+
+
+
+    toggleUrlListButton.addEventListener('click', (e) => {
+
+        e.stopPropagation();
+
+        urlListPanel.classList.add('active');
+
+    });
+
+
+
+    document.getElementById('closeUrlListButton').addEventListener('click', () => {
+
+        urlListPanel.classList.remove('active');
+
+    });
+
+
+
+    // Close panel when clicking outside
+
+    document.addEventListener('click', (e) => {
+
+        if (urlListPanel.classList.contains('active')) {
+
+            // Check if click is outside the panel
+
+            if (!urlListPanel.contains(e.target) && e.target !== toggleUrlListButton) {
+
+                urlListPanel.classList.remove('active');
+
+            }
+
+        }
+
+    });
+
+
+
+    // Prevent panel from closing when clicking inside it
+
+    urlListPanel.addEventListener('click', (e) => {
+
+        e.stopPropagation();
+
+    });
+
+
+
+    // --- CONFIRM MODAL LOGIC ---
+
+    const confirmModal = document.getElementById('confirmModal');
+
+    let pendingAction = null;
+
+
+
+    const openConfirm = (callback, options = {}) => {
+
+        pendingAction = callback;
+
+        const titleEl = document.getElementById('confirmModalTitle');
+
+        const alertEl = document.getElementById('confirmModalAlert');
+
+        const descEl = document.getElementById('confirmModalDesc');
+
+
+
+        if (titleEl) titleEl.textContent = options.title || 'SYSTEM ALERT: CRITICAL';
+
+        if (alertEl) alertEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${options.alertText || 'DELETION PROTOCOL INITIATED'}`;
+
+        if (descEl) descEl.innerHTML = options.description || 'This action will permanently purge the local database. This process is irreversible.<br><br>Confirm execution?';
+
+
+
+        confirmModal.classList.add('active');
+
+    };
+
+    window.openConfirm = openConfirm;
+
+
+
+    const closeConfirm = () => {
+
+        pendingAction = null;
+
+        confirmModal.classList.remove('active');
+
+    };
+
+
+
+    // Close confirm modal on overlay click
+
+    confirmModal.addEventListener('click', (e) => {
+
+        if (e.target === confirmModal) {
+
+            closeConfirm();
+
+        }
+
+    });
+
+
+
+    document.getElementById('executeConfirmButton').addEventListener('click', () => {
+
+        if (pendingAction) pendingAction();
+
+        closeConfirm();
+
+    });
+
+
+
+    document.getElementById('cancelConfirmButton').addEventListener('click', closeConfirm);
+
+    document.getElementById('closeConfirmModalButton').addEventListener('click', closeConfirm);
+
+
+
+    // Clear All
+
+    document.getElementById('clearAllButton').addEventListener('click', () => {
+
+        if (savedUrls.length === 0) return updateStatus('DATABASE EMPTY');
+
+        openConfirm(() => {
+
+            savedUrls = [];
+
+            saveUrls();
+
+            renderList();
+
+            updateStatus('REGISTRY PURGED. SYSTEM READY.');
+
+        }, {
+
+            title: 'SYSTEM ALERT: CRITICAL',
+
+            alertText: 'DATABASE PURGE PROTOCOL',
+
+            description: 'This action will permanently purge all stored URLs from the local database.<br><br>Confirm execution?'
+
+        });
+
+    });
+
+
+
+    // Resizer Logic with Magnetic Snap
+
+    let isDragging = false;
+
+    let startX = 0;
+
+    let startWidth = 0;
+
+    const MAGNETIC_THRESHOLD = 20; // pixels
+
+    const MAGNETIC_POSITIONS = {
+
+        '-1': 0.25,  // 25%
+
+        '0': 0.50,   // 50%
+
+        '1': 0.75    // 75%
+
+    };
+
+
+
+    // Create magnetic guide line
+
+    const magneticGuide = document.createElement('div');
+
+    magneticGuide.className = 'magnetic-guide';
+
+    const magneticLabel = document.createElement('div');
+
+    magneticLabel.className = 'magnetic-label';
+
+    magneticGuide.appendChild(magneticLabel);
+
+    document.body.appendChild(magneticGuide);
+
+
+
+    function getMagneticPosition(x, containerRect) {
+
+        const containerWidth = containerRect.width;
+
+        const relativeX = x - containerRect.left;
+
+        const relativePercent = relativeX / containerWidth;
+
+
+
+        let closestPos = null;
+
+        let closestDist = Infinity;
+
+        let closestLabel = '';
+
+
+
+        for (const [label, percent] of Object.entries(MAGNETIC_POSITIONS)) {
+
+            const targetX = containerRect.left + (containerWidth * percent);
+
+            const dist = Math.abs(x - targetX);
+
+
+
+            if (dist < MAGNETIC_THRESHOLD && dist < closestDist) {
+
+                closestDist = dist;
+
+                closestPos = targetX;
+
+                closestLabel = label;
+
+            }
+
+        }
+
+
+
+        return { position: closestPos, label: closestLabel };
+
+    }
+
+
+
+    resizer.addEventListener('mousedown', (e) => {
+
+        e.preventDefault();
+
+        isDragging = true;
+
+        startX = e.clientX;
+
+        startWidth = editorPanel.offsetWidth;
+
+        resizer.classList.add('dragging');
+
+        document.body.style.cursor = 'col-resize';
+
+        document.body.style.userSelect = 'none';
+
+        document.querySelector('iframe').style.pointerEvents = 'none';
+
+    });
+
+
+
+    document.addEventListener('mouseup', () => {
+
+        if (isDragging) {
+
+            isDragging = false;
+
+            resizer.classList.remove('dragging');
+
+            magneticGuide.classList.remove('active');
+
+            document.body.style.cursor = '';
+
+            document.body.style.userSelect = '';
+
+            document.querySelector('iframe').style.pointerEvents = 'auto';
+
+        }
+
+    });
+
+
+
+    document.addEventListener('mousemove', (e) => {
+
+        if (!isDragging) return;
+
+        e.preventDefault();
+
+        // Utrzymaj kursor col-resize podczas przeciągania
+
+        document.body.style.cursor = 'col-resize';
+
+        const container = document.querySelector('.content');
+
+        const containerRect = container.getBoundingClientRect();
+
+        const deltaX = e.clientX - startX;
+
+        let newWidth = startWidth + deltaX;
+
+        const containerWidth = containerRect.width;
+
+        const minWidth = containerWidth * 0.15;
+
+        const maxWidth = containerWidth * 0.85;
+
+
+
+        // Check for magnetic snap
+
+        const magnetic = getMagneticPosition(e.clientX, containerRect);
+
+
+
+        if (magnetic.position !== null) {
+
+            // Snap to magnetic position
+
+            const resizerHalf = (resizer.offsetWidth || 8) / 2;
+
+            newWidth = (magnetic.position - containerRect.left) - resizerHalf;
+
+            magneticGuide.style.left = `${magnetic.position}px`;
+
+            magneticLabel.textContent = magnetic.label;
+
+            magneticGuide.classList.add('active');
+
+        } else {
+
+            magneticGuide.classList.remove('active');
+
+        }
+
+
+
+        if (newWidth >= minWidth && newWidth <= maxWidth) {
+
+            editorPanel.style.width = `${newWidth}px`;
+
+            editorPanel.style.flexGrow = '0';
+
+            editorPanel.style.flexShrink = '0';
+
+        }
+
+    });
+
+
+
+    // Modal Logic
+
+    const modal = document.getElementById('addUrlModal');
+
+    document.getElementById('addCurrentUrlButton').addEventListener('click', () => {
+
+        modal.classList.add('active');
+
+        switchTab('single');
+
+        document.getElementById('modalUrlInput').value = document.getElementById('urlInput').value;
+
+    });
+
+    document.getElementById('closeModalButton').addEventListener('click', () => modal.classList.remove('active'));
+
+
+
+    // Close modal on overlay click
+
+    modal.addEventListener('click', (e) => {
+
+        if (e.target === modal) {
+
+            modal.classList.remove('active');
+
+        }
+
+    });
+
+
+
+    document.getElementById('modalAddButton').addEventListener('click', () => {
+
+        const url = document.getElementById('modalUrlInput').value;
+
+        const name = document.getElementById('modalNameInput').value || url.split('/').pop();
+
+        if (url) {
+
+            savedUrls.push({ name, url });
+
+            saveUrls();
+
+            renderList();
+
+            modal.classList.remove('active');
+
+            updateStatus(`RECORD ADDED: ${name}`);
+
+        }
+
+    });
+
+
+
+    // Tabs
+
+    document.querySelectorAll('.modal-tab').forEach(t => {
+
+        t.addEventListener('click', () => switchTab(t.dataset.tab));
+
+    });
+
+
+
+    // GitHub Load
+
+    document.getElementById('loadGithubButton').addEventListener('click', loadGithub);
+
+}
+
+
+
+function switchTab(tab) {
+
+    document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+
+    document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.add('hidden'));
+
+
+
+    document.querySelector(`.modal-tab[data-tab="${tab}"]`).classList.add('active');
+
+    document.getElementById(tab === 'single' ? 'tabSingle' : 'tabList').classList.remove('hidden');
+
+}
+
+
+
+function saveUrls() {
+
+    localStorage.setItem('savedUrls', JSON.stringify(savedUrls));
+
+}
+
+
+
+function renderList() {
+
+    const container = document.getElementById('urlListItems');
+
+    document.getElementById('dbCounter').innerText = `[${savedUrls.length.toString().padStart(2, '0')}]`;
+
+
+
+    if (savedUrls.length === 0) {
+
+        container.innerHTML = `<div class="url-list-empty">REGISTRY EMPTY // AWAITING DATA</div>`;
+
+        return;
+
+    }
+
+
+
+    container.innerHTML = savedUrls.map((item, idx) => `
+
+                <div class="url-item" onclick="loadUrl(${idx})">
+
+                    <div class="url-item-info">
+
+                        <span class="url-index">[${idx.toString().padStart(2, '0')}]</span>
+
+                        <span class="url-item-name">${item.name}</span>
+
+                    </div>
+
+                    <div class="btn-bg">
+
+                        <button class="btn-base btn-icon close url-item-delete" onclick="event.stopPropagation(); deleteUrl(${idx})" title="DELETE">
+
+                            <i class="fas fa-trash"></i>
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+            `).join('');
+
+}
+
+
+
+window.loadUrl = (idx) => {
+
+    const item = savedUrls[idx];
+
+    document.getElementById('urlInput').value = item.url;
+
+    document.getElementById('fetchButton').click();
+
+    document.getElementById('urlListPanel').classList.remove('active');
+
+};
+
+
+
+window.deleteUrl = (idx) => {
+
+    const item = savedUrls[idx];
+
+    const itemName = item ? item.name : `ITEM [${idx.toString().padStart(2, '0')}]`;
+
+
+
+    if (window.openConfirm) {
+
+        window.openConfirm(() => {
+
+            savedUrls.splice(idx, 1);
+
+            saveUrls();
+
+            renderList();
+
+            updateStatus(`RECORD PURGED: ${itemName}`);
+
+        }, {
+
+            title: 'RECORD REMOVAL PROTOCOL',
+
+            alertText: 'CONFIRM DELETE ENTRY',
+
+            description: `Target entry to be removed from database:<br><span class="modal-target-item">${itemName}</span><br><br>Confirm execution?`
+
+        });
+
+    } else {
+
+        savedUrls.splice(idx, 1);
+
+        saveUrls();
+
+        renderList();
+
+    }
+
+};
+
+
+
+function loadSavedUrls() {
+
+    renderList();
+
+}
+
+
+
+function loadGithub() {
+
+    const url = `https://raw.githubusercontent.com/${GITHUB_CFG.USER}/${GITHUB_CFG.REPO}/main/${GITHUB_CFG.FILE}`;
+
+    updateStatus('CONNECTING TO GITHUB MAIN NODE...');
+
+    fetch(url)
+
+        .then(r => r.json())
+
+        .then(data => {
+
+            let count = 0;
+
+            if (Array.isArray(data)) {
+
+                data.forEach(p => {
+
+                    if (!savedUrls.some(u => u.url === p.url)) {
+
+                        savedUrls.push({ name: p.name || p.url.split('/').pop(), url: p.url });
+
+                        count++;
+
+                    }
+
+                });
+
+                saveUrls();
+
+                renderList();
+
+                updateStatus(`SYNC COMPLETE. ${count} NEW OBJECTS.`);
+
+            }
+
+        })
+
+        .catch(e => updateStatus('SYNC ERROR: REPOSITORY UNREACHABLE'));
+
+}
+
+
+
+// Init
+
+themeEngine.init();
+
+Oto zaktualizowany kod. W funkcji loadGithub dodano cache-busting ?t=${Date.now()} z dynamicznym wykorzystaniem konfiguracji GITHUB_CFG (wraz z obsługą błędów HTTP i async/await), a w module Monaco dodano brakującą funkcję-stub loadSavedSettings(), która wywoływała błąd ReferenceError przy starcie edytora.
+
+JavaScript
 // --- CONFIG ---
 const GITHUB_CFG = {
     USER: 'skokivPr',
@@ -17,12 +2350,10 @@ const themeEngine = {
         document.documentElement.setAttribute('theme', next);
         localStorage.setItem('theme', next);
         if (window.monacoEditor && window.monaco) {
-            // Użyj motywów z monaco-styles.js jeśli są dostępne
             const theme = next === 'dark' ? 'terminal-dark' : 'terminal-light';
             try {
                 monaco.editor.setTheme(theme);
             } catch (e) {
-                // Fallback do standardowych motywów
                 monaco.editor.setTheme(next === 'dark' ? 'vs-dark' : 'vs');
             }
         }
@@ -47,26 +2378,22 @@ const sanitizeUrl = (url) => {
 
 const updateStatus = (msg) => {
     const el = document.getElementById('statusBar');
-    el.innerText = `[LOG]: ${msg.toUpperCase()}`;
+    if (el) el.innerText = `[LOG]: ${msg.toUpperCase()}`;
 };
 
 // --- EDITOR LOGIC ---
 require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
 
 require(['vs/editor/editor.main'], function () {
-    // Poczekaj na załadowanie motywów z monaco-styles.js
     setTimeout(() => {
         const savedContent = localStorage.getItem('editorContent') || '<!-- INITIALIZING SYSTEM... -->';
 
-        // Użyj motywów z monaco-styles.js jeśli są dostępne
         let theme = document.documentElement.getAttribute('theme') === 'light' ? 'terminal-light' : 'terminal-dark';
         try {
-            // Sprawdź czy motyw jest zdefiniowany
             if (typeof monaco !== 'undefined' && monaco.editor) {
                 monaco.editor.setTheme(theme);
             }
         } catch (e) {
-            // Fallback do standardowych motywów
             theme = document.documentElement.getAttribute('theme') === 'light' ? 'vs' : 'vs-dark';
         }
 
@@ -93,7 +2420,6 @@ require(['vs/editor/editor.main'], function () {
             localStorage.setItem('editorContent', window.monacoEditor.getValue());
         });
 
-        // Bind Events after Monaco Load
         setupEventListeners();
         loadSavedUrls();
         loadSavedSettings();
@@ -102,6 +2428,10 @@ require(['vs/editor/editor.main'], function () {
 
 // --- APP LOGIC ---
 let savedUrls = JSON.parse(localStorage.getItem('savedUrls') || '[]');
+
+function loadSavedSettings() {
+    // Rezerwa na dodatkowe flagi konfiguracyjne UI / edytora
+}
 
 function setupEventListeners() {
     // Fetch
@@ -120,7 +2450,6 @@ function setupEventListeners() {
             window.monacoEditor.setValue(text);
             updateStatus('COMPILE COMPLETE');
 
-            // Auto-detect language
             if (url.endsWith('.js')) updateLanguageSelection('javascript');
             else if (url.endsWith('.css')) updateLanguageSelection('css');
             else if (url.endsWith('.json')) updateLanguageSelection('json');
@@ -175,7 +2504,7 @@ function setupEventListeners() {
         if (editorPanel.classList.contains('hidden')) {
             previewPanel.style.width = '100%';
         } else {
-            previewPanel.style.width = ''; // Reset to flex
+            previewPanel.style.width = '';
         }
     });
 
@@ -259,22 +2588,19 @@ function setupEventListeners() {
         urlListPanel.classList.remove('active');
     });
 
-    // Close panel when clicking outside
     document.addEventListener('click', (e) => {
         if (urlListPanel.classList.contains('active')) {
-            // Check if click is outside the panel
             if (!urlListPanel.contains(e.target) && e.target !== toggleUrlListButton) {
                 urlListPanel.classList.remove('active');
             }
         }
     });
 
-    // Prevent panel from closing when clicking inside it
     urlListPanel.addEventListener('click', (e) => {
         e.stopPropagation();
     });
 
-    // --- CONFIRM MODAL LOGIC ---
+    // Confirm Modal Logic
     const confirmModal = document.getElementById('confirmModal');
     let pendingAction = null;
 
@@ -297,7 +2623,6 @@ function setupEventListeners() {
         confirmModal.classList.remove('active');
     };
 
-    // Close confirm modal on overlay click
     confirmModal.addEventListener('click', (e) => {
         if (e.target === confirmModal) {
             closeConfirm();
@@ -331,14 +2656,13 @@ function setupEventListeners() {
     let isDragging = false;
     let startX = 0;
     let startWidth = 0;
-    const MAGNETIC_THRESHOLD = 20; // pixels
+    const MAGNETIC_THRESHOLD = 20;
     const MAGNETIC_POSITIONS = {
-        '-1': 0.25,  // 25%
-        '0': 0.50,   // 50%
-        '1': 0.75    // 75%
+        '-1': 0.25,
+        '0': 0.50,
+        '1': 0.75
     };
 
-    // Create magnetic guide line
     const magneticGuide = document.createElement('div');
     magneticGuide.className = 'magnetic-guide';
     const magneticLabel = document.createElement('div');
@@ -377,7 +2701,8 @@ function setupEventListeners() {
         resizer.classList.add('dragging');
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
-        document.querySelector('iframe').style.pointerEvents = 'none';
+        const iframe = document.querySelector('iframe');
+        if (iframe) iframe.style.pointerEvents = 'none';
     });
 
     document.addEventListener('mouseup', () => {
@@ -387,14 +2712,14 @@ function setupEventListeners() {
             magneticGuide.classList.remove('active');
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
-            document.querySelector('iframe').style.pointerEvents = 'auto';
+            const iframe = document.querySelector('iframe');
+            if (iframe) iframe.style.pointerEvents = 'auto';
         }
     });
 
     document.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
         e.preventDefault();
-        // Utrzymaj kursor col-resize podczas przeciągania
         document.body.style.cursor = 'col-resize';
         const container = document.querySelector('.content');
         const containerRect = container.getBoundingClientRect();
@@ -404,11 +2729,9 @@ function setupEventListeners() {
         const minWidth = containerWidth * 0.15;
         const maxWidth = containerWidth * 0.85;
 
-        // Check for magnetic snap
         const magnetic = getMagneticPosition(e.clientX, containerRect);
 
         if (magnetic.position !== null) {
-            // Snap to magnetic position
             const resizerHalf = (resizer.offsetWidth || 8) / 2;
             newWidth = (magnetic.position - containerRect.left) - resizerHalf;
             magneticGuide.style.left = `${magnetic.position}px`;
@@ -434,7 +2757,6 @@ function setupEventListeners() {
     });
     document.getElementById('closeModalButton').addEventListener('click', () => modal.classList.remove('active'));
 
-    // Close modal on overlay click
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
             modal.classList.remove('active');
@@ -476,7 +2798,8 @@ function saveUrls() {
 
 function renderList() {
     const container = document.getElementById('urlListItems');
-    document.getElementById('dbCounter').innerText = `[${savedUrls.length.toString().padStart(2, '0')}]`;
+    const dbCounter = document.getElementById('dbCounter');
+    if (dbCounter) dbCounter.innerText = `[${savedUrls.length.toString().padStart(2, '0')}]`;
 
     if (savedUrls.length === 0) {
         container.innerHTML = `<div class="url-list-empty">REGISTRY EMPTY // AWAITING DATA</div>`;
@@ -484,18 +2807,18 @@ function renderList() {
     }
 
     container.innerHTML = savedUrls.map((item, idx) => `
-                <div class="url-item" onclick="loadUrl(${idx})">
-                    <div class="url-item-info">
-                        <span class="url-index">[${idx.toString().padStart(2, '0')}]</span>
-                        <span class="url-item-name">${item.name}</span>
-                    </div>
-                    <div class="btn-bg">
-                        <button class="btn-base btn-icon close url-item-delete" onclick="event.stopPropagation(); deleteUrl(${idx})" title="DELETE">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </div>
-            `).join('');
+        <div class="url-item" onclick="loadUrl(${idx})">
+            <div class="url-item-info">
+                <span class="url-index">[${idx.toString().padStart(2, '0')}]</span>
+                <span class="url-item-name">${item.name}</span>
+            </div>
+            <div class="btn-bg">
+                <button class="btn-base btn-icon close url-item-delete" onclick="event.stopPropagation(); deleteUrl(${idx})" title="DELETE">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
 }
 
 window.loadUrl = (idx) => {
@@ -531,27 +2854,613 @@ function loadSavedUrls() {
     renderList();
 }
 
-function loadGithub() {
-    const url = `https://raw.githubusercontent.com/${GITHUB_CFG.USER}/${GITHUB_CFG.REPO}/main/${GITHUB_CFG.FILE}`;
+async function loadGithub() {
+    const url = `https://raw.githubusercontent.com/${GITHUB_CFG.USER}/${GITHUB_CFG.REPO}/main/${GITHUB_CFG.FILE}?t=${Date.now()}`;
     updateStatus('CONNECTING TO GITHUB MAIN NODE...');
-    fetch(url)
-        .then(r => r.json())
-        .then(data => {
-            let count = 0;
-            if (Array.isArray(data)) {
-                data.forEach(p => {
-                    if (!savedUrls.some(u => u.url === p.url)) {
-                        savedUrls.push({ name: p.name || p.url.split('/').pop(), url: p.url });
-                        count++;
-                    }
-                });
-                saveUrls();
-                renderList();
-                updateStatus(`SYNC COMPLETE. ${count} NEW OBJECTS.`);
-            }
-        })
-        .catch(e => updateStatus('SYNC ERROR: REPOSITORY UNREACHABLE'));
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const data = await response.json();
+        let count = 0;
+
+        if (Array.isArray(data)) {
+            data.forEach(p => {
+                if (!savedUrls.some(u => u.url === p.url)) {
+                    savedUrls.push({ name: p.name || p.url.split('/').pop(), url: p.url });
+                    count++;
+                }
+            });
+            saveUrls();
+            renderList();
+            updateStatus(`SYNC COMPLETE. ${count} NEW OBJECTS.`);
+        } else {
+            updateStatus('SYNC ERROR: INVALID JSON FORMAT');
+        }
+    } catch (e) {
+        updateStatus(`SYNC ERROR: REPOSITORY UNREACHABLE (${e.message})`);
+    }
 }
 
 // Init
 themeEngine.init();
+caly kod
+
+Oto kompletny, zintegrowany plik JavaScript ze wszystkimi funkcjami, obsługą modali, resizera z przyciąganiem magnetycznym, Monaco Editor oraz pobieraniem z GitHuba z aktywnym cache-bustingiem (?t=):
+
+JavaScript
+// --- CONFIG ---
+const GITHUB_CFG = {
+    USER: 'skokivPr',
+    REPO: 'json-lista',
+    FILE: 'html.json'
+};
+
+// --- THEME ENGINE ---
+const themeEngine = {
+    init: () => {
+        const saved = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('theme', saved);
+    },
+    toggle: () => {
+        const current = document.documentElement.getAttribute('theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('theme', next);
+        localStorage.setItem('theme', next);
+
+        if (window.monacoEditor && window.monaco) {
+            const theme = next === 'dark' ? 'terminal-dark' : 'terminal-light';
+            try {
+                monaco.editor.setTheme(theme);
+            } catch (e) {
+                monaco.editor.setTheme(next === 'dark' ? 'vs-dark' : 'vs');
+            }
+        }
+    }
+};
+
+// --- UTILS ---
+const sanitizeUrl = (url) => {
+    try {
+        if (!url) return '';
+        const u = new URL(url);
+        if (u.hostname === 'github.com' && u.pathname.includes('/blob/')) {
+            u.hostname = 'raw.githubusercontent.com';
+            u.pathname = u.pathname.replace('/blob/', '/');
+        }
+        if (u.hostname === 'gist.github.com') {
+            u.hostname = 'gist.githubusercontent.com';
+        }
+        return u.toString();
+    } catch (e) {
+        return url;
+    }
+};
+
+const updateStatus = (msg) => {
+    const el = document.getElementById('statusBar');
+    if (el) el.innerText = `[LOG]: ${msg.toUpperCase()}`;
+};
+
+// --- EDITOR LOGIC ---
+require.config({ 
+    paths: { 
+        'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' 
+    } 
+});
+
+require(['vs/editor/editor.main'], function () {
+    setTimeout(() => {
+        const savedContent = localStorage.getItem('editorContent') || '<!-- INITIALIZING SYSTEM... -->';
+
+        let theme = document.documentElement.getAttribute('theme') === 'light' ? 'terminal-light' : 'terminal-dark';
+        try {
+            if (typeof monaco !== 'undefined' && monaco.editor) {
+                monaco.editor.setTheme(theme);
+            }
+        } catch (e) {
+            theme = document.documentElement.getAttribute('theme') === 'light' ? 'vs' : 'vs-dark';
+        }
+
+        window.monacoEditor = monaco.editor.create(document.getElementById('monacoEditorContainer'), {
+            value: savedContent || "// TERMINAL_READY\n// START_CODING...",
+            language: 'html',
+            theme: theme,
+            fontSize: 13,
+            fontFamily: "'JetBrains Mono', 'Share Tech Mono', 'Consolas', 'Monaco', 'Courier New', monospace",
+            automaticLayout: true,
+            minimap: { enabled: true },
+            scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
+            cursorBlinking: 'block',
+            bracketPairColorization: { enabled: true },
+            guides: { bracketPairs: true, indent: true },
+            renderLineHighlight: 'line',
+            smoothScrolling: true,
+            mouseWheelZoom: true,
+            wordWrap: 'on',
+            fontLigatures: true
+        });
+
+        window.monacoEditor.onDidChangeModelContent(() => {
+            localStorage.setItem('editorContent', window.monacoEditor.getValue());
+        });
+
+        setupEventListeners();
+        loadSavedUrls();
+        loadSavedSettings();
+    }, 100);
+});
+
+// --- APP LOGIC ---
+let savedUrls = JSON.parse(localStorage.getItem('savedUrls') || '[]');
+
+function loadSavedSettings() {
+    // Miejsce na ewentualne dodatkowe flagi konfiguracyjne ze storage
+}
+
+function setupEventListeners() {
+    // --- FETCH ENGINE ---
+    document.getElementById('fetchButton').addEventListener('click', async () => {
+        const url = sanitizeUrl(document.getElementById('urlInput').value);
+        if (!url) return updateStatus('ERROR: MISSING TARGET URL');
+
+        updateStatus('INITIATING CONNECTION...');
+        const loader = document.getElementById('loader');
+        const icon = document.querySelector('.fa-download');
+
+        if (loader) loader.style.display = 'block';
+        if (icon) icon.style.display = 'none';
+
+        try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const text = await res.text();
+            window.monacoEditor.setValue(text);
+            updateStatus('COMPILE COMPLETE');
+
+            const lowerUrl = url.toLowerCase();
+            if (lowerUrl.endsWith('.js')) updateLanguageSelection('javascript');
+            else if (lowerUrl.endsWith('.ts')) updateLanguageSelection('typescript');
+            else if (lowerUrl.endsWith('.css')) updateLanguageSelection('css');
+            else if (lowerUrl.endsWith('.json')) updateLanguageSelection('json');
+            else if (lowerUrl.endsWith('.html') || lowerUrl.endsWith('.htm')) updateLanguageSelection('html');
+            else if (lowerUrl.endsWith('.md')) updateLanguageSelection('markdown');
+        } catch (e) {
+            updateStatus(`CRITICAL ERROR: ${e.message}`);
+        } finally {
+            if (loader) loader.style.display = 'none';
+            if (icon) icon.style.display = 'inline-block';
+        }
+    });
+
+    // --- PREVIEW ENGINE ---
+    document.getElementById('updatePreviewButton').addEventListener('click', () => {
+        let code = window.monacoEditor.getValue();
+        const hideScrollbarStyle = `<style>
+                    html, body, * {
+                        scrollbar-width: none !important;
+                        -ms-overflow-style: none !important;
+                    }
+                    html::-webkit-scrollbar, body::-webkit-scrollbar, *::-webkit-scrollbar {
+                        display: none !important;
+                        width: 0 !important;
+                        height: 0 !important;
+                    }
+                </style>`;
+
+        if (code.includes('</head>')) {
+            code = code.replace('</head>', hideScrollbarStyle + '</head>');
+        } else {
+            code = hideScrollbarStyle + code;
+        }
+
+        document.getElementById('previewFrame').srcdoc = code;
+        updateStatus('COMPILE COMPLETE');
+    });
+
+    document.getElementById('stopPreviewButton').addEventListener('click', () => {
+        document.getElementById('previewFrame').srcdoc = '';
+        updateStatus('STOP');
+    });
+
+    // --- UI TOGGLES ---
+    document.getElementById('themeToggle').addEventListener('click', themeEngine.toggle);
+
+    const editorPanel = document.getElementById('editorPanel');
+    const previewPanel = document.getElementById('previewPanel');
+    const resizer = document.getElementById('resizer');
+
+    document.getElementById('toggleEditorButton').addEventListener('click', () => {
+        editorPanel.classList.toggle('hidden');
+        resizer.classList.toggle('hidden');
+        if (editorPanel.classList.contains('hidden')) {
+            previewPanel.style.width = '100%';
+        } else {
+            previewPanel.style.width = '';
+        }
+    });
+
+    // --- CUSTOM SELECT LANGUAGE ---
+    const customSelect = document.getElementById('languageCustomSelect');
+    const selectTrigger = customSelect?.querySelector('.select-trigger');
+    const selectOptions = customSelect?.querySelector('.select-options');
+    const nativeSelect = document.getElementById('languageSelector');
+
+    function updateLanguageSelection(val) {
+        if (nativeSelect) nativeSelect.value = val;
+        const options = selectOptions?.querySelectorAll('.option');
+        options?.forEach(opt => {
+            if (opt.dataset.value === val) {
+                opt.classList.add('selected');
+                const triggerContent = selectTrigger?.querySelector('.trigger-content');
+                if (triggerContent) {
+                    const icon = opt.querySelector('i')?.cloneNode(true);
+                    triggerContent.innerHTML = '';
+                    if (icon) triggerContent.appendChild(icon);
+                    const textSpan = document.createElement('span');
+                    textSpan.textContent = opt.textContent.trim();
+                    triggerContent.appendChild(textSpan);
+                }
+            } else {
+                opt.classList.remove('selected');
+            }
+        });
+        if (window.monacoEditor && window.monaco) {
+            monaco.editor.setModelLanguage(window.monacoEditor.getModel(), val);
+        }
+    }
+
+    window.updateLanguageSelection = updateLanguageSelection;
+
+    if (selectTrigger && selectOptions) {
+        selectTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = selectOptions.classList.contains('show');
+            selectOptions.classList.toggle('show', !isOpen);
+            selectTrigger.classList.toggle('active', !isOpen);
+            selectTrigger.setAttribute('aria-expanded', String(!isOpen));
+        });
+
+        selectOptions.querySelectorAll('.option').forEach(opt => {
+            opt.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const val = opt.dataset.value;
+                updateLanguageSelection(val);
+                selectOptions.classList.remove('show');
+                selectTrigger.classList.remove('active');
+                selectTrigger.setAttribute('aria-expanded', 'false');
+            });
+        });
+
+        document.addEventListener('click', (e) => {
+            if (customSelect && !customSelect.contains(e.target)) {
+                selectOptions.classList.remove('show');
+                selectTrigger.classList.remove('active');
+                selectTrigger.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
+
+    if (nativeSelect) {
+        nativeSelect.addEventListener('change', (e) => {
+            updateLanguageSelection(e.target.value);
+        });
+    }
+
+    // --- DATABASE PANEL ---
+    const urlListPanel = document.getElementById('urlListPanel');
+    const toggleUrlListButton = document.getElementById('toggleUrlListButton');
+
+    toggleUrlListButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        urlListPanel.classList.add('active');
+    });
+
+    document.getElementById('closeUrlListButton').addEventListener('click', () => {
+        urlListPanel.classList.remove('active');
+    });
+
+    document.addEventListener('click', (e) => {
+        if (urlListPanel.classList.contains('active')) {
+            if (!urlListPanel.contains(e.target) && e.target !== toggleUrlListButton) {
+                urlListPanel.classList.remove('active');
+            }
+        }
+    });
+
+    urlListPanel.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+
+    // --- CONFIRM MODAL LOGIC ---
+    const confirmModal = document.getElementById('confirmModal');
+    let pendingAction = null;
+
+    const openConfirm = (callback, options = {}) => {
+        pendingAction = callback;
+        const titleEl = document.getElementById('confirmModalTitle');
+        const alertEl = document.getElementById('confirmModalAlert');
+        const descEl = document.getElementById('confirmModalDesc');
+
+        if (titleEl) titleEl.textContent = options.title || 'SYSTEM ALERT: CRITICAL';
+        if (alertEl) alertEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${options.alertText || 'DELETION PROTOCOL INITIATED'}`;
+        if (descEl) descEl.innerHTML = options.description || 'This action will permanently purge the local database. This process is irreversible.<br><br>Confirm execution?';
+
+        confirmModal.classList.add('active');
+    };
+    window.openConfirm = openConfirm;
+
+    const closeConfirm = () => {
+        pendingAction = null;
+        confirmModal.classList.remove('active');
+    };
+
+    confirmModal.addEventListener('click', (e) => {
+        if (e.target === confirmModal) {
+            closeConfirm();
+        }
+    });
+
+    document.getElementById('executeConfirmButton').addEventListener('click', () => {
+        if (pendingAction) pendingAction();
+        closeConfirm();
+    });
+
+    document.getElementById('cancelConfirmButton').addEventListener('click', closeConfirm);
+    document.getElementById('closeConfirmModalButton').addEventListener('click', closeConfirm);
+
+    // --- CLEAR ALL DATABASE ---
+    document.getElementById('clearAllButton').addEventListener('click', () => {
+        if (savedUrls.length === 0) return updateStatus('DATABASE EMPTY');
+        openConfirm(() => {
+            savedUrls = [];
+            saveUrls();
+            renderList();
+            updateStatus('REGISTRY PURGED. SYSTEM READY.');
+        }, {
+            title: 'SYSTEM ALERT: CRITICAL',
+            alertText: 'DATABASE PURGE PROTOCOL',
+            description: 'This action will permanently purge all stored URLs from the local database.<br><br>Confirm execution?'
+        });
+    });
+
+    // --- RESIZER LOGIC ---
+    let isDragging = false;
+    let startX = 0;
+    let startWidth = 0;
+    const MAGNETIC_THRESHOLD = 20;
+    const MAGNETIC_POSITIONS = {
+        '-1': 0.25,
+        '0': 0.50,
+        '1': 0.75
+    };
+
+    const magneticGuide = document.createElement('div');
+    magneticGuide.className = 'magnetic-guide';
+    const magneticLabel = document.createElement('div');
+    magneticLabel.className = 'magnetic-label';
+    magneticGuide.appendChild(magneticLabel);
+    document.body.appendChild(magneticGuide);
+
+    function getMagneticPosition(x, containerRect) {
+        const containerWidth = containerRect.width;
+        let closestPos = null;
+        let closestDist = Infinity;
+        let closestLabel = '';
+
+        for (const [label, percent] of Object.entries(MAGNETIC_POSITIONS)) {
+            const targetX = containerRect.left + (containerWidth * percent);
+            const dist = Math.abs(x - targetX);
+
+            if (dist < MAGNETIC_THRESHOLD && dist < closestDist) {
+                closestDist = dist;
+                closestPos = targetX;
+                closestLabel = label;
+            }
+        }
+
+        return { position: closestPos, label: closestLabel };
+    }
+
+    resizer.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        isDragging = true;
+        startX = e.clientX;
+        startWidth = editorPanel.offsetWidth;
+        resizer.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        
+        const iframe = document.querySelector('iframe');
+        if (iframe) iframe.style.pointerEvents = 'none';
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isDragging) {
+            isDragging = false;
+            resizer.classList.remove('dragging');
+            magneticGuide.classList.remove('active');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            
+            const iframe = document.querySelector('iframe');
+            if (iframe) iframe.style.pointerEvents = 'auto';
+        }
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        document.body.style.cursor = 'col-resize';
+
+        const container = document.querySelector('.content');
+        const containerRect = container.getBoundingClientRect();
+        const deltaX = e.clientX - startX;
+        let newWidth = startWidth + deltaX;
+        const containerWidth = containerRect.width;
+        const minWidth = containerWidth * 0.15;
+        const maxWidth = containerWidth * 0.85;
+
+        const magnetic = getMagneticPosition(e.clientX, containerRect);
+
+        if (magnetic.position !== null) {
+            const resizerHalf = (resizer.offsetWidth || 8) / 2;
+            newWidth = (magnetic.position - containerRect.left) - resizerHalf;
+            magneticGuide.style.left = `${magnetic.position}px`;
+            magneticLabel.textContent = magnetic.label;
+            magneticGuide.classList.add('active');
+        } else {
+            magneticGuide.classList.remove('active');
+        }
+
+        if (newWidth >= minWidth && newWidth <= maxWidth) {
+            editorPanel.style.width = `${newWidth}px`;
+            editorPanel.style.flexGrow = '0';
+            editorPanel.style.flexShrink = '0';
+        }
+    });
+
+    // --- ADD URL MODAL ---
+    const modal = document.getElementById('addUrlModal');
+    document.getElementById('addCurrentUrlButton').addEventListener('click', () => {
+        modal.classList.add('active');
+        switchTab('single');
+        document.getElementById('modalUrlInput').value = document.getElementById('urlInput').value;
+    });
+
+    document.getElementById('closeModalButton').addEventListener('click', () => modal.classList.remove('active'));
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.classList.remove('active');
+    });
+
+    document.getElementById('modalAddButton').addEventListener('click', () => {
+        const url = document.getElementById('modalUrlInput').value;
+        const name = document.getElementById('modalNameInput').value || url.split('/').pop() || 'Unnamed';
+        if (url) {
+            savedUrls.push({ name, url });
+            saveUrls();
+            renderList();
+            modal.classList.remove('active');
+            updateStatus(`RECORD ADDED: ${name}`);
+        }
+    });
+
+    document.querySelectorAll('.modal-tab').forEach(t => {
+        t.addEventListener('click', () => switchTab(t.dataset.tab));
+    });
+
+    document.getElementById('loadGithubButton').addEventListener('click', loadGithub);
+}
+
+function switchTab(tab) {
+    document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.add('hidden'));
+
+    document.querySelector(`.modal-tab[data-tab="${tab}"]`).classList.add('active');
+    document.getElementById(tab === 'single' ? 'tabSingle' : 'tabList').classList.remove('hidden');
+}
+
+function saveUrls() {
+    localStorage.setItem('savedUrls', JSON.stringify(savedUrls));
+}
+
+function renderList() {
+    const container = document.getElementById('urlListItems');
+    const dbCounter = document.getElementById('dbCounter');
+    if (dbCounter) dbCounter.innerText = `[${savedUrls.length.toString().padStart(2, '0')}]`;
+
+    if (savedUrls.length === 0) {
+        container.innerHTML = `<div class="url-list-empty">REGISTRY EMPTY // AWAITING DATA</div>`;
+        return;
+    }
+
+    container.innerHTML = savedUrls.map((item, idx) => `
+        <div class="url-item" onclick="loadUrl(${idx})">
+            <div class="url-item-info">
+                <span class="url-index">[${idx.toString().padStart(2, '0')}]</span>
+                <span class="url-item-name">${item.name}</span>
+            </div>
+            <div class="btn-bg">
+                <button class="btn-base btn-icon close url-item-delete" onclick="event.stopPropagation(); deleteUrl(${idx})" title="DELETE">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+window.loadUrl = (idx) => {
+    const item = savedUrls[idx];
+    document.getElementById('urlInput').value = item.url;
+    document.getElementById('fetchButton').click();
+    document.getElementById('urlListPanel').classList.remove('active');
+};
+
+window.deleteUrl = (idx) => {
+    const item = savedUrls[idx];
+    const itemName = item ? item.name : `ITEM [${idx.toString().padStart(2, '0')}]`;
+
+    if (window.openConfirm) {
+        window.openConfirm(() => {
+            savedUrls.splice(idx, 1);
+            saveUrls();
+            renderList();
+            updateStatus(`RECORD PURGED: ${itemName}`);
+        }, {
+            title: 'RECORD REMOVAL PROTOCOL',
+            alertText: 'CONFIRM DELETE ENTRY',
+            description: `Target entry to be removed from database:<br><span class="modal-target-item">${itemName}</span><br><br>Confirm execution?`
+        });
+    } else {
+        savedUrls.splice(idx, 1);
+        saveUrls();
+        renderList();
+    }
+};
+
+function loadSavedUrls() {
+    renderList();
+}
+
+// --- GITHUB LOAD (CACHE-BUSTING) ---
+async function loadGithub() {
+    const url = `https://raw.githubusercontent.com/${GITHUB_CFG.USER}/${GITHUB_CFG.REPO}/main/${GITHUB_CFG.FILE}?t=${Date.now()}`;
+    updateStatus('CONNECTING TO GITHUB MAIN NODE...');
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const data = await response.json();
+        let count = 0;
+
+        if (Array.isArray(data)) {
+            data.forEach(p => {
+                if (!savedUrls.some(u => u.url === p.url)) {
+                    savedUrls.push({ 
+                        name: p.name || p.url.split('/').pop(), 
+                        url: p.url 
+                    });
+                    count++;
+                }
+            });
+            saveUrls();
+            renderList();
+            updateStatus(`SYNC COMPLETE. ${count} NEW OBJECTS.`);
+        } else {
+            updateStatus('SYNC ERROR: INVALID JSON FORMAT');
+        }
+    } catch (e) {
+        updateStatus(`SYNC ERROR: REPOSITORY UNREACHABLE (${e.message})`);
+    }
+}
+
+// Init
+themeEngine.init();
+
+
+
+Gemini to AI i może popełniać błędy, także co do ludzi. Twoja prywatność i GeminiOtwiera się w nowym oknie
+

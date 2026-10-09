@@ -516,9 +516,9 @@ function loadSavedUrls() {
   renderList();
 }
 
-// Zrefaktoryzowane na nowoczesne async/await
+// Zrefaktoryzowane na nowoczesne async/await z cache-bustingiem (?t=Date.now())
 async function loadGithub() {
-  const url = `https://raw.githubusercontent.com/${GITHUB_CFG.USER}/${GITHUB_CFG.REPO}/main/${GITHUB_CFG.FILE}`;
+  const url = `https://raw.githubusercontent.com/${GITHUB_CFG.USER}/${GITHUB_CFG.REPO}/main/${GITHUB_CFG.FILE}?t=${Date.now()}`;
   updateStatus("CONNECTING TO GITHUB MAIN NODE...");
 
   try {

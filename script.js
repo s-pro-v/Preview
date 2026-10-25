@@ -1,6 +1,6 @@
 // --- CONFIG ---
 const GITHUB_CFG = {
-    USER: 'skokivPr',
+    USER: 's-pro-v',
     REPO: 'json-lista',
     FILE: 'html.json'
 };
@@ -51,7 +51,7 @@ const updateStatus = (msg) => {
 };
 
 // --- EDITOR LOGIC ---
-require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
+require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.0/min/vs' } });
 
 require(['vs/editor/editor.main'], function () {
     // Poczekaj na załadowanie motywów z monaco-styles.js
@@ -529,6 +529,9 @@ window.deleteUrl = (idx) => {
 
 function loadSavedUrls() {
     renderList();
+    if (savedUrls.length === 0) {
+        loadGithub();
+    }
 }
 
 function loadGithub() {
@@ -540,8 +543,9 @@ function loadGithub() {
             let count = 0;
             if (Array.isArray(data)) {
                 data.forEach(p => {
-                    if (!savedUrls.some(u => u.url === p.url)) {
-                        savedUrls.push({ name: p.name || p.url.split('/').pop(), url: p.url });
+                    if (p && p.url && !savedUrls.some(u => u.url === p.url)) {
+                        const displayName = p.title || p.name || p.filename || p.url.split('/').pop();
+                        savedUrls.push({ name: displayName, url: p.url });
                         count++;
                     }
                 });
